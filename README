@@ -1,0 +1,11 @@
+This is a repo for some GIS related stuff I'm working on.
+
+Some things I want to do:
+    Create a script to mass download or selectively download GeoTIFF
+        maps from libremap.org
+    Create a database of the information in those maps, such as the
+        boundary coordinates for each one
+   Create a program that plots GPS tracks on the topo maps.  Ideally
+       the program would stitch together multiple maps when necessary
+
+My plan is to use the GDAL library from Python.
