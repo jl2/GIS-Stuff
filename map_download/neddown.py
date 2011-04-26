@@ -61,20 +61,6 @@ from PyQt4 import QtCore
 
 import concurrent.futures
 
-# A "main window" for coordinating child dialog boxes
-class MultiWindows(QtGui.QMainWindow):
-    def __init__(self):
-        super(MultiWindows, self).__init__(None)
-        self.__windows = []
-
-    def addWindow(self, window):
-        self.__windows.append(window)
-
-    def show(self):
-        for current_child_window in self.__windows:
-             current_child_window.exec_()
-        self.destroy()
-
 # Simple parser to grab the final URL of the data
 class LinkParser(html.parser.HTMLParser):
     def __init__(self):
@@ -98,17 +84,25 @@ def download_ned(ned):
 # Dialog box with a QtWebKit control to download and process
 # downloads using Javascript
 class FancyDownloader(QtGui.QDialog):
-    def __init__(self, ned, executor, parent=None):
+    def __init__(self, neds, executor, parent=None):
         super(FancyDownloader, self).__init__(parent)
-
+            
         # store some info for later
-        self.ned = ned
+        self.neds = neds
+        print(self.neds)
+        if len(self.neds)==0:
+            self.close()
+            self.destroy()
+            return
+        self.curNedIdx = 0
         self.executor = executor
-        self.url = ned['new_url']
+        print('current idx',self.curNedIdx)
+        print('num neds', len(self.neds))
+        self.curNed = self.neds[self.curNedIdx]
 
         # Create the web control
         self.qwp = QtWebKit.QWebView(self)
-        self.qwp.load(QtCore.QUrl(self.url))
+        self.qwp.load(QtCore.QUrl(self.curNed['new_url']))
         self.connect(self.qwp, QtCore.SIGNAL('loadFinished(bool)'),
                      self.loadFinished)
 
@@ -127,8 +121,16 @@ class FancyDownloader(QtGui.QDialog):
         parser.feed(htmlText)
         if parser.url is not None and parser.url.find('downloadID')>0:
             print('The download URL is:', parser.url)
-            self.ned['good_url'] = parser.url
-            self.executor.submit(download_ned, self.ned)
+            self.curNed['good_url'] = parser.url
+            self.executor.submit(download_ned, self.curNed)
+            self.curNedIdx += 1
+            if self.curNedIdx<len(self.neds):
+                self.curNed = self.neds[self.curNedIdx]
+                self.qwp.setUrl(QtCore.QUrl(self.curNed['new_url']))
+            else:
+                print('Done with WebKit, closing and destroying window!')
+                self.close()
+                self.destroy()
 
             # A possible alternative that doesn't use an HTMLParser:
             # urlRx = re.compile('.*"(http://extract\.cr\.usgs\.gov/axis2/services/DownloadService/getData\?downloadID=.*)" style.*')
@@ -136,8 +138,8 @@ class FancyDownloader(QtGui.QDialog):
             # if mt is not None:
             #     self.ned['good_url'] = mt.group(1)
             #     self.executor.submit(download_ned, self.ned)
-            self.reject()
-pass
+            # self.reject()
+
 # This is a mess
 # Parse the page at
 # http://gisdata.usgs.gov/XMLWebServices2/getTDDSDownloadURLs.aspx?XMin=
@@ -259,9 +261,9 @@ def main(args):
     # Fix some screwed up HTML before parsing it
     body = body.replace('false;=', 'false=')
     parser = MyHTMLParser()
+    # print(body)
     parser.feed(body)
-
-
+    # print('Retry at:', parser.retryUrl)
     neds = list()
     sessionID = ''
     sessionRx = re.compile('.*(\(S\(.+\)\)).*')
@@ -277,6 +279,7 @@ def main(args):
         r2 = conn.getresponse()
 
         body = r2.read().decode()
+        # print(body)
         # Again, fix bad HTML before parsing
         body = body.replace('false;=', 'false=')
         body = body.replace('onclick=','onclick="')
@@ -289,7 +292,10 @@ def main(args):
     else:
         # No retry
         neds = parser.neds
-    
+
+    if len(neds)==0:
+        print("An error occured fetching the NED URLs!")
+        exit(2)
     # Create the output directory if it doesn't exist
     if not os.path.exists(outDir):
         os.makedirs( outDir )
@@ -316,15 +322,16 @@ def main(args):
             nt['out_dir'] = outDir
             toDownload.append(nt)
 
-    # Create some "FancyDownloaders" and set them up to download 
+    # Create a "FancyDownloader" and start downloading the NEDs concurrently
     app = QtGui.QApplication([])
-    windows = MultiWindows()
+    rv = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
-        for ned in toDownload:
-            fd = FancyDownloader(ned, executor)
-            windows.addWindow(fd)
-        windows.show()
-        app.exec_()
+        fd = FancyDownloader(toDownload, executor)
+        fd.show()
+        rv = app.exec_()
+
+    # Bye
+    sys.exit(rv)
 
 if __name__=='__main__':
     main(sys.argv[1:])
