@@ -1,0 +1,13 @@
+hmrender
+
+This utility uses 3Delight and GDAL to render a rotating view of NED dataset.
+
+It was primarily created as a quick and dirty way to get a good view of a NED dataset.  It's not very robust and doesn't do much error checking.
+
+To use it:
+make
+mkdir output
+./hmrender outname /path/to/ned/adfFile.adf
+
+This will open the file /path/to/ned/adfFile.adf, and create a series of images named "./output/outname0000.tif" .. "./output/outname0035.tif".
+

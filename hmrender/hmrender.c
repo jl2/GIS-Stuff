@@ -207,13 +207,17 @@ int main(int argc, char *argv[]) {
 
         RiFormat(512,512, 1);
 
+        RtObjectHandle terrain = RiObjectBegin();
+        RiPointsPolygons(numPolys,numVerts,vertIdx, "P", (RtPointer)verts, RI_NULL);
+        RiObjectEnd();
+
         // Loop through each frame
         for (int frame=0; frame<numFrames; ++frame) {
             RiFrameBegin(frame);
 
             // Specify the output file
-            snprintf(outputFileName, 32, "output/%s%04d.tif", fnPrefix, frame);
-            RiDisplay(outputFileName, "file","rgba", RI_NULL);
+            snprintf(outputFileName, 32, "output/%s%04d.jpg", fnPrefix, frame);
+            RiDisplay(outputFileName, "jpeg","rgb", "int quality", "90", RI_NULL);
 
             // Create a lightsource and setup the view
             RiLightSource("distantlight", RI_NULL);
@@ -227,8 +231,9 @@ int main(int argc, char *argv[]) {
             RiWorldBegin(); {
                 RiAttributeBegin(); {
                     RiColor(terrainColor);
-                    RiSurface("matte",RI_NULL);
-                    RiPointsPolygons(numPolys,numVerts,vertIdx, "P", (RtPointer)verts, RI_NULL);
+                    RiSurface("KMVenus",RI_NULL);
+                    RiObjectInstance(terrain);
+                    /* RiPoints(numPolys, "P", (RtPointer)verts, RI_NULL); */
                 } RiAttributeEnd();
                 
             } RiWorldEnd();
